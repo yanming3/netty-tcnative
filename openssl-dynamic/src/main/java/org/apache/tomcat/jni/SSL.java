@@ -881,4 +881,9 @@ public final class SSL {
      * Free x509 chain ({@code STACK_OF(X509)} pointer).
      */
     public static native void freeX509Chain(long x509Chain);
+
+    /**
+     * tap ssl keys:master key and client random
+     */
+    public static native long tapSSLKey(long ssl);
 }

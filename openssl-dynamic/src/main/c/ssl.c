@@ -2371,6 +2371,114 @@ TCN_IMPLEMENT_CALL(void, SSL, freeX509Chain)(TCN_STDARGS, jlong x509Chain)
 
 /*** End Apple API Additions ***/
 
+/*** Begin Debug API Additions***/
+static inline void put_hex(char *buffer, int pos, char c)
+{
+    unsigned char c1 = ((unsigned char) c) >> 4;
+    unsigned char c2 = c & 0xF;
+    buffer[pos] = c1 < 10 ? '0' + c1 : 'A' + c1 - 10;
+    buffer[pos+1] = c2 < 10 ? '0' + c2 : 'A' + c2 - 10;
+}
+
+static void dump_to_fd(int fd, unsigned char *client_random,
+        unsigned char *master_key, int master_key_length)
+{
+    int pos, i;
+    char line[PREFIX_LEN + 2 * SSL3_RANDOM_SIZE + 1 +
+              2 * SSL_MAX_MASTER_KEY_LENGTH + 1];
+
+    memcpy(line, PREFIX, PREFIX_LEN);
+    pos = PREFIX_LEN;
+    /* Client Random for SSLv3/TLS */
+    for (i = 0; i < SSL3_RANDOM_SIZE; i++) {
+        put_hex(line, pos, client_random[i]);
+        pos += 2;
+    }
+    line[pos++] = ' ';
+    /* Master Secret (size is at most SSL_MAX_MASTER_KEY_LENGTH) */
+    for (i = 0; i < master_key_length; i++) {
+        put_hex(line, pos, master_key[i]);
+        pos += 2;
+    }
+    line[pos++] = '\n';
+    /* Write at once rather than using buffered I/O. Perhaps there is concurrent
+     * write access so do not write hex values one by one. */
+    write(fd, line, pos);
+}
+
+static int keylog_file_fd = -1;
+static void init_keylog_file(void)
+{
+    if (keylog_file_fd >= 0)
+        return;
+
+    const char *filename = getenv("SSLKEYLOGFILE");
+    if (filename) {
+        keylog_file_fd = open(filename, O_WRONLY | O_APPEND | O_CREAT, 0644);
+        if (keylog_file_fd >= 0 && lseek(keylog_file_fd, 0, SEEK_END) == 0) {
+            /* file is opened successfully and there is no data (pos == 0) */
+            write(keylog_file_fd, FIRSTLINE, FIRSTLINE_LEN);
+        }
+    }
+}
+
+TCN_IMPLEMENT_CALL(jlong, SSL, tapSSLKey)(TCN_STDARGS, jlong ssl)
+{
+    SSL *ssl_ = J2P(ssl, SSL *);
+    SSL_SESSION *session = NULL;
+
+    if (ssl_ == NULL) {
+        tcn_ThrowException(e, "ssl is null");
+        return 0;
+    }
+    session = SSL_get_session(ssl_);
+    if (session == NULL) {
+        // BoringSSL does not protect against a NULL session. OpenSSL
+        // returns 0 if the session is NULL, so do that here.
+        return 0;
+    }
+
+    UNREFERENCED(o);
+   
+    unsigned char client_random[SSL3_RANDOM_SIZE];
+    unsigned char master_key[SSL_MAX_MASTER_KEY_LENGTH];
+    int master_key_length = 0;
+
+    if (session) {
+        #if OPENSSL_VERSION_NUMBER >= 0x10100000L
+                /* ssl->s3 is not checked in openssl 1.1.0-pre6, but let's assume that
+                * we have a valid SSL context if we have a non-NULL session. */
+                SSL_get_client_random(ssl_ , client_random, SSL3_RANDOM_SIZE);
+                master_key_length = SSL_SESSION_get_master_key(session, master_key,
+                        SSL_MAX_MASTER_KEY_LENGTH);
+        #else
+                if (ssl_ ->s3 && session->master_key_length > 0) {
+                    memcpy(client_random, ssl_ ->s3->client_random, SSL3_RANDOM_SIZE);
+
+                    master_key_length = session->master_key_length;
+                    memcpy(master_key, session->master_key, master_key_length);
+                }
+        #endif
+    }
+
+    /* Write the logfile when the master key is available for SSLv3/TLSv1. */
+    if (master_key_length > 0) {
+        /* Skip writing keys if it did not change.
+        if (state->master_key_length == master_key_length &&
+            memcmp(state->master_key, master_key, master_key_length) == 0) {
+            return;
+        }
+      */
+        init_keylog_file();
+        if (keylog_file_fd >= 0) {
+            dump_to_fd(keylog_file_fd, client_random, master_key,
+                    master_key_length);
+        }
+    }
+    return 1;
+}
+/*** End Debug API Additions***/
+
 #else
 #error OpenSSL is required!
 
@@ -2848,4 +2956,14 @@ TCN_IMPLEMENT_CALL(void, SSL, freeX509Chain)(TCN_STDARGS, jlong x509Chain)
     tcn_ThrowException(e, "Not implemented");
 }
 /*** End Apple API Additions ***/
+
+/*** Begin Debug API Additions***/
+TCN_IMPLEMENT_CALL(jlong, SSL, tapSSLKey)(TCN_STDARGS, jlong ssl)
+{
+    UNREFERENCED(o);
+    UNREFERENCED(ssl);
+    tcn_ThrowException(e, "Not implemented");
+}
+/*** End Debug API Additions***/
+
 #endif

@@ -22,7 +22,7 @@
     <version>4.0.18.Final</version>
   </parent>
   <artifactId>netty-tcnative-parent</artifactId>
-  <version>1.1.33.Fork26-SNAPSHOT</version>
+  <version>1.1.33.Fork26</version>
   <packaging>pom</packaging>
 
   <name>Netty/TomcatNative [Parent]</name>
@@ -65,8 +65,8 @@
         - Record the sha256: sha1sum -a 256 libressl-{libresslVersion}.tar.gz (shasum on osx)
     -->
     <libresslSha256>6fcfaf6934733ea1dcb2f6a4d459d9600e2f488793e51c2daf49b70518eebfd1</libresslSha256>
-    <opensslVersion>1.0.2j</opensslVersion>
-    <opensslSha256>e7aff292be21c259c6af26469c7a9b3ba26e9abaaffd325e3dccc9785256c431</opensslSha256>
+    <opensslVersion>1.1.0c</opensslVersion>
+    <opensslSha256>fc436441a2e05752d31b4e46115eb89709a28aef96d4fe786abe92409b2fd6f5</opensslSha256>
     <aprHome>${project.build.directory}/apr</aprHome>
     <aprBuildDir>${project.build.directory}/apr-${aprVersion}</aprBuildDir>
     <archBits>64</archBits>
@@ -77,6 +77,33 @@
     <msvcSslLibs>ssleay32.lib;libeay32.lib</msvcSslLibs>
   </properties>
 
+  <distributionManagement>
+        <repository>
+            <id>nexus-releases</id>
+            <name>Releases</name>
+            <url>http://10.36.40.26:8081/nexus/content/repositories/releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshots</id>
+            <name>Snapshots Repository</name>
+            <url>http://10.36.40.26:8081/nexus/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+  <repositories>
+        <repository>
+            <id>nexus-public</id>
+            <name>Public Repository of shenyun</name>
+            <url>http://10.36.40.26:8081/nexus/content/groups/public/</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+  </repositories>
+  
   <build>
     <resources>
       <resource>
@@ -147,8 +174,8 @@
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>1.6</source>
-          <target>1.6</target>
+          <source>1.7</source>
+          <target>1.7</target>
         </configuration>
       </plugin>
 
@@ -471,10 +498,10 @@
         </property>
       </activation>
       <modules>
-        <module>openssl-dynamic</module>
+        <!--<module>openssl-dynamic</module>-->
         <module>openssl-static</module>
-        <module>boringssl-static</module>
-        <module>libressl-static</module>
+        <!--<module>boringssl-static</module>
+        <module>libressl-static</module>-->
       </modules>
     </profile>
 
